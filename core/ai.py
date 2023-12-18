@@ -191,6 +191,7 @@ class Conversation:
             for x in tunggakans:
                 tagihan = Tagihan.objects.get(pk = x.id)
                 if tagihan.nama_tagihan != x.title or tagihan.jumlah_tagihan != x.jumlah:
+                    self.memory.clear()
                     return 'terdapat anomali batalkan transaksi. beri tau siswa bahwa terjadi error'
                 
                 amount += x.jumlah
