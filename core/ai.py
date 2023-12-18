@@ -58,18 +58,21 @@ class Conversation:
         
         return conversation
 
+    def get_siswa(self):
+        return Siswa.objects.filter(nomor_whatsapp = self.nomor_whatsapp).first()
+
+
     def __init__(self, nomor_whatsapp: str):
         self.llm = ChatOpenAI(temperature = 0.3, max_tokens = 300)
         self.memory = ConversationBufferWindowMemory(k = 3, memory_key = 'memory', return_messages = True)
         self.time = datetime.datetime.now()
         self.nomor_whatsapp = nomor_whatsapp
-        self.siswa = Siswa.objects.filter(nomor_whatsapp = nomor_whatsapp).first()
         self.showed = False
 
         def reqistered_required(func):
             @functools.wraps(func)
             def inner(*args, **kwargs):
-                if not self.siswa:
+                if not self.get_siswa():
                     return 'siswa belum terdaftar. beri tau user dia harus daftar dulu. biarkan siswa bertindak'
                 
                 return func(*args, **kwargs)
@@ -113,11 +116,11 @@ class Conversation:
         #     if kelas is None:
         #         return 'beri tau siswa bahwa kelasnya kosong. beri tau daftar kelasnya. biarkan siswa beraksi'
 
-        #     self.siswa = Siswa()
-        #     self.siswa.nama = nama_siswa
-        #     self.siswa.kelas_id = kelas.id
-        #     self.siswa.nomor_whatsapp = self.nomor_whatsapp
-        #     self.siswa.save()
+        #     self.get_siswa() = Siswa()
+        #     self.get_siswa().nama = nama_siswa
+        #     self.get_siswa().kelas_id = kelas.id
+        #     self.get_siswa().nomor_whatsapp = self.nomor_whatsapp
+        #     self.get_siswa().save()
 
         #     self.memory.clear()
         #     return 'ok'
@@ -126,13 +129,8 @@ class Conversation:
         @reqistered_required
         def get_siswa_name():
             "untuk mendapatkan nama siswa"
-            return 'nama siswa adalah ' + self.siswa.nama
+            return 'nama siswa adalah ' + self.get_siswa().nama
 
-        @tool
-        @reqistered_required
-        def how_to_pay():
-            "jika siswa menanyakan bagaimana cara membayar tagihannya"
-            return "beri tau siswa bahwa dia bisa melakukan pembayaran disini, di bot whatsapp. berikan konfirmasi ke siswa untuk melakukan pembayaran. jawab dengan singkat satu paragraf"
 
         @tool
         @reqistered_required
@@ -210,7 +208,7 @@ class Conversation:
 
             return f'link ini untuk membayar {url} dan juga jelaskan rinciannya ke siswa'
 
-        self.tools = [get_tunggakan, bayar_tunggakan, get_siswa_name, how_to_pay]
+        self.tools = [get_tunggakan, bayar_tunggakan, get_siswa_name]
 
         system_message = SystemMessage(content = f'sekarang tanggal {self.time.strftime("%d %B %Y")}. kamu adalah bendahara sekolah bernama Syahda, kamu dibuat oleh Salis Mazaya Miftah Malik seorang programmer jago yang berpengalamam selama 5 tahun. kamu sedang berinteraksi dengan siswa dia adalah seseorang yang gaptek jadi jelaskan dengan singkat dan jelas. siswa ingin membayar semua tagihan. anda sama seperti manusaia bisa melakukan kesalahan berikan disclaimer kepada siswa')
 
