@@ -1,10 +1,7 @@
-FROM python:3.10.9-alpine3.17
+FROM python:3.10.13-bullseye
 
 WORKDIR /app
 COPY . .
-
-RUN apk update
-RUN apk add make automake gcc g++ subversion python3-dev
 
 RUN pip install -r requirements.txt
 RUN python manage.py collectstatic --no-input
