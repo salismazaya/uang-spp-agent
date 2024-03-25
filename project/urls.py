@@ -16,10 +16,9 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from core.views import webhook, midtrans_webhook
+from core.views import midtrans_webhook
 
 urlpatterns = [
-    path('webhook/wa/', webhook),
     path('webhook/midtrans/', midtrans_webhook),
     path('', admin.site.urls),
 ]

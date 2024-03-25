@@ -1,14 +1,13 @@
 from __future__ import annotations
+from langchain import hub
+from langchain.prompts.chat import ChatPromptTemplate
 from django.conf import settings
-from langchain.chat_models import ChatOpenAI
-from langchain.agents import AgentType, initialize_agent, tool
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain.agents import AgentExecutor, tool, create_openai_tools_agent
 from langchain.memory import ConversationBufferWindowMemory
-from langchain.prompts import MessagesPlaceholder
 from langchain.schema import SystemMessage
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.callbacks import get_openai_callback
 from dataclasses import dataclass
-from core.models import Tagihan, Siswa, Payment, Kelas
+from core.models import Tagihan, Siswa, Payment
 from numpy.linalg import norm
 import datetime, typing, midtransclient
 import numpy as np, functools
@@ -69,7 +68,7 @@ class Conversation:
         self.nomor_whatsapp = nomor_whatsapp
         self.showed = False
 
-        def reqistered_required(func):
+        def registered_required(func):
             @functools.wraps(func)
             def inner(*args, **kwargs):
                 if not self.get_siswa():
@@ -78,62 +77,16 @@ class Conversation:
                 return func(*args, **kwargs)
             
             return inner
-
-        # @tool
-        # def get_all_kelas() -> typing.List[KelasData]:
-        #     "untuk mendapatkan seluruh kelas"
-        #     kelass = Kelas.objects.all()
-        #     rv = []
-        #     for kelas in kelass:
-        #         rv.append(
-        #             KelasData(
-        #                 id = kelas.pk,
-        #                 nama_kelas = kelas.nama_kelas
-        #             )
-        #         )
-            
-        #     return rv
-
-        # @tool
-        # def get_kelas(kelas_id: int) -> KelasData:
-        #     "untuk mendapatkan salah satu kelas"
-        #     kelas = Kelas.objects.filter(pk = kelas_id).first()
-        #     if not kelas:
-        #         return 'kelas tidak ada'
-            
-        #     return KelasData(
-        #         id = kelas_id,
-        #         nama_kelas = kelas.nama_kelas
-        #     )
-
-        # @tool
-        # def register(nama_siswa: str = None, kelas: KelasData = None) -> str:
-        #     "untuk register. nama siswa dan kelas, hasil dari input user"
-
-        #     if nama_siswa is None:
-        #         return 'beri tau siswa bahwa namanya kosong. biarkan siswa beraksi'
-            
-        #     if kelas is None:
-        #         return 'beri tau siswa bahwa kelasnya kosong. beri tau daftar kelasnya. biarkan siswa beraksi'
-
-        #     self.get_siswa() = Siswa()
-        #     self.get_siswa().nama = nama_siswa
-        #     self.get_siswa().kelas_id = kelas.id
-        #     self.get_siswa().nomor_whatsapp = self.nomor_whatsapp
-        #     self.get_siswa().save()
-
-        #     self.memory.clear()
-        #     return 'ok'
-
+        
         @tool
-        @reqistered_required
+        @registered_required
         def get_siswa_name():
             "untuk mendapatkan nama siswa"
             return 'nama siswa adalah ' + self.get_siswa().nama
 
 
         @tool
-        @reqistered_required
+        @registered_required
         def get_tunggakan(
             tahun_end: int = self.time.year,
             bulan_end: int = self.time.month,
@@ -170,7 +123,7 @@ class Conversation:
             return 'tidak ada tagihan'
 
         @tool
-        @reqistered_required
+        @registered_required
         def bayar_tunggakan(tunggakans: typing.List[Keren] = None) -> str:
             """
             untuk bayar tunggakan
@@ -212,25 +165,15 @@ class Conversation:
 
         system_message = SystemMessage(content = f'sekarang tanggal {self.time.strftime("%d %B %Y")}. kamu adalah bendahara sekolah bernama Syahda, kamu dibuat oleh Salis Mazaya Miftah Malik seorang programmer jago yang berpengalamam selama 5 tahun. kamu sedang berinteraksi dengan siswa dia adalah seseorang yang gaptek jadi jelaskan dengan singkat dan jelas. siswa ingin membayar semua tagihan. anda sama seperti manusaia bisa melakukan kesalahan berikan disclaimer kepada siswa')
 
-        self.agent_executor = initialize_agent(
-            tools = self.tools, 
-            llm = self.llm, 
-            agent = AgentType.OPENAI_FUNCTIONS, 
-            verbose = settings.DEBUG,
-            handle_parsing_errors = True,
-            agent_kwargs = {
-                "system_message": system_message,
-                "extra_prompt_messages": [MessagesPlaceholder(variable_name = "memory")],
-            },
-            memory = self.memory,
-        )
+        prompt: ChatPromptTemplate = hub.pull("hwchase17/openai-tools-agent")
+        prompt.messages.insert(0, system_message)
+
+        agent = create_openai_tools_agent(self.llm, self.tools, prompt)
+        self.agent_executor = AgentExecutor(agent = agent, tools = self.tools, verbose = True)
     
     def __call__(self, text: str):
-        with get_openai_callback() as cb:
-            rv = replace_markdown_links(
-                self.agent_executor.run(text)
-            )
-        if settings.DEBUG:
-            print(cb)
+        rv = replace_markdown_links(
+            self.agent_executor.invoke({'input': text, 'chat_history': self.memory.buffer_as_messages})['output'],
+        )
         
         return rv

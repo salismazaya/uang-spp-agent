@@ -5,3 +5,4 @@ tes2.py
 __pycache__
 db.sqlite3
 staticfiles
+session.db
